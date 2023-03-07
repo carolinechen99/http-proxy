@@ -1,0 +1,91 @@
+Concurrent request: 
+    Need multi-threading to handle multiple requests at the same time.
+    Add a thread pool before the request and response handlers.
+
+
+
+Message type:
+    cannot use string when sending and receiving messages. Should use vector<char> instead, because '\0' could be problematic.
+
+
+
+Loop to get all messages for recv():
+    The loop to get all messages should be implemented for recv() since the message could be split into multiple packets.
+    -Sudo code for recv:
+        Recv 
+        Parse what you Recv
+        While(condition):
+            Continue recv
+        The first Recv is used to parse header and see if it has finished. After the first recv, you have already have everything you need to know in this response. 
+In the following recv, you don’t need to parse them, just recv and send to client.
+    -p.s. just one send() is enough, throw an exception and close current threads.
+
+
+Cache:
+    The cache should be implemented as a LRU cache, which is a queue with a hash table. The queue is used to store the keys, and the hash table is used to store the values. When a new key is inserted, it is inserted into the queue and the hash table. When a key is accessed, it is moved to the front of the queue. When the cache is full, the key at the back of the queue is removed from the queue and the hash table.
+    - The queue should be implemented as a doubly linked list.
+    - When get response from server, the response should be stored in the cache, and remember to update hashmap to make sure the key is in the front of the queue.
+    - delete the earliest used Resp when it is full.
+    - don't consider the cache control in requests since we are not caching requests.
+
+
+    
+
+GET:
+    - The connection between the client and server can be either closed or kept open after the completion of the request. 
+    This is determined by the Connection header in the request and response messages.
+    If the Connection header is set to close in the request, the server will close the connection after the response is sent. If the Connection header is set to keep-alive
+
+
+Implementation:
+    The whole proxy service is wrapped into the daemon process, not create a new daemon thread to handle the log and cache.
+
+
+Parsing:
+    Boost library is used to parse the request and response messages. We didn't use it for this project, but it is a good library to use for future projects.
+
+
+Request size:
+    For requeset from client side, can generate a big buffer to receive the request. 
+    Example:  MAX_LENGTH = 65536
+
+
+Error handling:
+    - invalid request: 502 Bad Gateway--response/ 400 Bad Request--request
+    - If your program is parsing some header and the format is not what you expected, 
+    the program should not break but should handle the exception gracefully 
+    and return a response indicating an error to your client. 
+
+
+Revalidation:
+    -  Key: "max-age", "max-stale", "must-revalidate", "no-cache", "no-store", "private" and "public"
+    -  a proxy should first look for s-maxage and if the response includes it, the proxy ignores the maxage directive. 
+    If there is no s-maxage, then it should look for maxage. We only check for maxage in this project for simplicity.
+    - max-stale = N, allowed to send a response in your cache that has exceeded the max-age for N seconds.
+    - "must-revalidate" directive takes precedence over the "max-stale"
+
+    - if reponse is 200, store it in cache, and retrieve it from cache to send to client
+    - if response is 304, send it from cache to client
+
+
+Cache-Control:
+    request:
+    - 1.not in cache: does not find in cache -- retrieve from server and store in cache
+    - 2.in cahce, but expired at EXPIREDTIME --revalidate max-age>0, max-stale = N+max-age >0, send cached response to client
+    - 3.in cache, but requires validation: --revalidate "no-cache", "proxy-revalidate", "must-revalidate", "min-fresh", "max-age=0"
+    - 4.in cache, valid --do nothing, does nothing (even maxage, but max-stale satisfiled), send cached response to client
+    
+    response:
+    - 1.not cacheable because: "no-store", "private" -- send new response to client
+    --2.cached, expires at Expires: max-age>0 (no max-stale) -- send to cached_response to client
+    --3.cached but requires revalidation:"no-cache", "proxy-revalidate", "must-revalidate", "max-age=0" --revalidate(includes sending new response to client)
+ 
+
+Connection header:
+    - Connection: keep-alive/Connection: close
+
+
+
+Testcases:
+    document the test cases for each types of request as well as the expected results and logs in a text file.
+    see testcases.txt and testlog.log
